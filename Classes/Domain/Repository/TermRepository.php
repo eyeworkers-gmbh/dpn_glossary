@@ -10,11 +10,10 @@ namespace Featdd\DpnGlossary\Domain\Repository;
  * For the full copyright and license information, please read the
  * LICENSE.txt file that was distributed with this source code.
  *
- *  (c) 2024 Daniel Dorndorf <dorndorf@featdd.de>
+ *  (c) 2025 Daniel Dorndorf <dorndorf@featdd.de>
  *
  ***/
 
-use Featdd\DpnGlossary\Domain\Model\Term;
 use TYPO3\CMS\Extbase\Persistence\QueryInterface;
 use TYPO3\CMS\Extbase\Persistence\QueryResultInterface;
 

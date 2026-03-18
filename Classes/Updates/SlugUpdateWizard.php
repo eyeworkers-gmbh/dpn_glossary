@@ -10,21 +10,20 @@ namespace Featdd\DpnGlossary\Updates;
  * For the full copyright and license information, please read the
  * LICENSE.txt file that was distributed with this source code.
  *
- *  (c) 2024 Daniel Dorndorf <dorndorf@featdd.de>
+ *  (c) 2025 Daniel Dorndorf <dorndorf@featdd.de>
  *
  ***/
 
+use Doctrine\DBAL\ParameterType;
 use Featdd\DpnGlossary\Domain\Model\TermInterface;
-use PDO;
 use TYPO3\CMS\Core\DataHandling\Model\RecordStateFactory;
 use TYPO3\CMS\Core\DataHandling\SlugHelper;
 use TYPO3\CMS\Core\Exception\SiteNotFoundException;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
+use TYPO3\CMS\Install\Attribute\UpgradeWizard;
 use TYPO3\CMS\Install\Updates\DatabaseUpdatedPrerequisite;
 
-/**
- * @package Featdd\DpnGlossary\Updates
- */
+#[UpgradeWizard('SlugUpdateWizard')]
 class SlugUpdateWizard extends AbstractUpdateWizard
 {
     public const SEGMENT_FIELD = 'name';
@@ -95,7 +94,7 @@ class SlugUpdateWizard extends AbstractUpdateWizard
                 ->where(
                     $queryBuilder->expr()->eq(
                         'uid',
-                        $queryBuilder->createNamedParameter($termUid, PDO::PARAM_INT)
+                        $queryBuilder->createNamedParameter($termUid, ParameterType::INTEGER)
                     )
                 )
                 ->executeStatement();

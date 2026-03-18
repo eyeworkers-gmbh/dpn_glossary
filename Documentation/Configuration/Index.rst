@@ -1,13 +1,4 @@
-﻿.. ==================================================
-.. FOR YOUR INFORMATION
-.. --------------------------------------------------
-.. -*- coding: utf-8 -*- with BOM.
-
-.. include:: ../Includes.txt
-
-.. _configuration:
-
-=============
+﻿=============
 Configuration
 =============
 
@@ -36,6 +27,7 @@ If you want to add umlauts to the pagination you have to check the terms table c
     Reference
     ExampleTypoScriptSetup
     AddTermsToYourBreadcrumb
+    RenderTermsWithFluidTemplate
     ConfigureRoutingForTermsAndPagination
     CreateXmlSitemapForTerms
     ExcludeContentFromParser

@@ -10,7 +10,7 @@ namespace Featdd\DpnGlossary\Service;
  * For the full copyright and license information, please read the
  * LICENSE.txt file that was distributed with this source code.
  *
- *  (c) 2024 Daniel Dorndorf <dorndorf@featdd.de>
+ *  (c) 2025 Daniel Dorndorf <dorndorf@featdd.de>
  *
  ***/
 
@@ -23,9 +23,11 @@ use DOMXPath;
 use Featdd\DpnGlossary\Domain\Model\TermInterface;
 use Featdd\DpnGlossary\Domain\Repository\ParserTermRepository;
 use Featdd\DpnGlossary\Utility\ParserUtility;
+use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Core\Cache\Frontend\FrontendInterface;
 use TYPO3\CMS\Core\Context\Context;
 use TYPO3\CMS\Core\Context\Exception\AspectNotFoundException;
+use TYPO3\CMS\Core\Routing\PageArguments;
 use TYPO3\CMS\Core\SingletonInterface;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Extbase\Configuration\ConfigurationManager;
@@ -91,73 +93,90 @@ class ParserService implements SingletonInterface
         /** @var \TYPO3\CMS\Extbase\Persistence\Generic\Typo3QuerySettings $querySettings */
         $querySettings = GeneralUtility::makeInstance(Typo3QuerySettings::class);
         // Get Typoscript Configuration
-        $this->typoScriptConfiguration = $configurationManager->getConfiguration(ConfigurationManagerInterface::CONFIGURATION_TYPE_FULL_TYPOSCRIPT);
+        $this->typoScriptConfiguration = $configurationManager->getConfiguration(
+            ConfigurationManagerInterface::CONFIGURATION_TYPE_FULL_TYPOSCRIPT
+        );
         // Reduce TS config to plugin
         $this->typoScriptConfiguration = $this->typoScriptConfiguration['plugin.']['tx_dpnglossary.'] ?? [];
 
         if (count($this->typoScriptConfiguration) > 0) {
             // Save extension settings without ts dots
-            $this->settings = GeneralUtility::removeDotsFromTS($this->typoScriptConfiguration['settings.']);
-            // Set StoragePid in the query settings object
-            $querySettings->setStoragePageIds(
-                GeneralUtility::trimExplode(
-                    ',',
-                    $this->typoScriptConfiguration['persistence.']['storagePid'] ?? ''
-                )
-            );
+            $this->settings = GeneralUtility::removeDotsFromTS($this->typoScriptConfiguration['settings.'] ?? []);
 
-            $parsingSpecialWrapCharacters = GeneralUtility::trimExplode(',', $this->settings['parsingSpecialWrapCharacters'] ?? '', true);
+            $parsingSpecialWrapCharacters = GeneralUtility::trimExplode(
+                ',',
+                $this->settings['parsingSpecialWrapCharacters'] ?? '',
+                true
+            );
 
             if (count($parsingSpecialWrapCharacters) > 0) {
                 foreach ($parsingSpecialWrapCharacters as $parsingSpecialWrapCharacter) {
-                    self::$additionalRegexWrapCharacters .= '|' . preg_quote($parsingSpecialWrapCharacter);
+                    self::$additionalRegexWrapCharacters .= '|' . str_replace('#', '\#', $parsingSpecialWrapCharacter);
                 }
             }
 
             try {
                 /** @var \TYPO3\CMS\Core\Context\Context $context */
                 $context = GeneralUtility::makeInstance(Context::class);
-                $sysLanguageUid = $context->getPropertyFromAspect('language', 'id');
+                $languageId = $context->getPropertyFromAspect('language', 'id');
             } catch (AspectNotFoundException) {
-                $sysLanguageUid = 0;
+                $languageId = 0;
             }
 
             /** @var \Featdd\DpnGlossary\Domain\Repository\TermRepositoryInterface $termRepository */
-            $termRepository = GeneralUtility::makeInstance($this->settings['parserRepositoryClass'] ?? ParserTermRepository::class);
+            $termRepository = GeneralUtility::makeInstance(
+                $this->settings['parserRepositoryClass'] ?? ParserTermRepository::class
+            );
 
-            // Set current language uid
-            $querySettings->setLanguageUid($sysLanguageUid);
-            // Set query to respect the language uid
-            $querySettings->setRespectSysLanguage(true);
-            // Assign query settings object to repository
-            $termRepository->setDefaultQuerySettings($querySettings);
+            $storagePids = GeneralUtility::intExplode(
+                ',',
+                $this->typoScriptConfiguration['persistence.']['storagePid'] ?? '',
+                true
+            );
 
-            //Find all terms
-            if (!($this->settings['useCachingFramework'] ?? true)) {
-                $terms = $termRepository->findByNameLength();
-            } else {
-                $cacheIdentifier = sha1('termsByNameLength' . $querySettings->getLanguageUid() . '_' . implode('', $querySettings->getStoragePageIds()));
-                $terms = $termsCache->get($cacheIdentifier);
+            if (!empty($storagePids)) {
+                // Set StoragePid in the query settings object
+                // (this is necessary outside extbase context due to storagePid not getting injected automatically)
+                $querySettings->setStoragePageIds($storagePids);
 
-                // If $terms is empty, it hasn't been cached. Calculate the value and store it in the cache:
-                if (empty($terms)) {
+                // Assign query settings object to repository
+                $termRepository->setDefaultQuerySettings($querySettings);
+
+                //Find all terms
+                if (!($this->settings['useCachingFramework'] ?? true)) {
                     $terms = $termRepository->findByNameLength();
-                    // Save value in cache
-                    $termsCache->set($cacheIdentifier, $terms, ['dpnglossary_termscache']);
+                } else {
+                    $cacheIdentifier = sha1(
+                        sprintf('termsByNameLength_%s_%s', $languageId, implode('', $querySettings->getStoragePageIds()))
+                    );
+                    $terms = $termsCache->get($cacheIdentifier);
+
+                    // If $terms is empty, it hasn't been cached. Calculate the value and store it in the cache:
+                    if (empty($terms)) {
+                        $terms = $termRepository->findByNameLength();
+                        // Save value in cache
+                        $termsCache->set($cacheIdentifier, $terms, [
+                            ...array_map(
+                                fn(int $storagePid) => sprintf('storage-%d', $storagePid),
+                                $querySettings->getStoragePageIds()
+                            ),
+                            sprintf('language-%d', $languageId),
+                        ]);
+                    }
                 }
-            }
 
-            //Sort terms with an individual counter for max replacement per page
-            /** @var \Featdd\DpnGlossary\Domain\Model\TermInterface $term */
-            foreach ($terms as $term) {
-                $maxReplacements = $term->getMaxReplacements() === -1
-                    ? (int)($this->settings['maxReplacementPerPage'] ?? -1)
-                    : $term->getMaxReplacements();
+                //Sort terms with an individual counter for max replacement per page
+                /** @var \Featdd\DpnGlossary\Domain\Model\TermInterface $term */
+                foreach ($terms as $term) {
+                    $maxReplacements = $term->getMaxReplacements() === -1
+                        ? (int)($this->settings['maxReplacementPerPage'] ?? -1)
+                        : $term->getMaxReplacements();
 
-                $this->terms[] = [
-                    'term' => $term,
-                    'replacements' => $maxReplacements,
-                ];
+                    $this->terms[] = [
+                        'term' => $term,
+                        'replacements' => $maxReplacements,
+                    ];
+                }
             }
         }
     }
@@ -166,11 +185,12 @@ class ParserService implements SingletonInterface
      * parse html for terms and return the parsed html
      * or false if parsers has to be aborted
      *
+     * @param \Psr\Http\Message\ServerRequestInterface $request
      * @param string $html
      * @return string
      * @throws \Featdd\DpnGlossary\Service\Exception
      */
-    public function pageParser(string $html): string
+    public function pageParser(ServerRequestInterface $request, string $html): string
     {
         // extract Pids which should be parsed
         $parsingPids = GeneralUtility::intExplode(',', $this->settings['parsingPids'] ?? '');
@@ -183,8 +203,16 @@ class ParserService implements SingletonInterface
             $tags = array_diff($tags, self::$alwaysIgnoreParentTags);
         }
 
-        $currentPageId = (int)$GLOBALS['TSFE']->id;
-        $currentPageType = (int)$GLOBALS['TSFE']->type;
+        /** @var \TYPO3\CMS\Core\Routing\PageArguments $pageArguments */
+        $pageArguments = $request->getAttribute('routing');
+
+        // If no proper page arguments exist in the request abort here
+        if (!$pageArguments instanceof PageArguments) {
+            return $html;
+        }
+
+        $currentPageId = $pageArguments->getPageId();
+        $currentPageType = (int)$pageArguments->getPageType();
 
         // Abort parser...
         if (
@@ -218,10 +246,18 @@ class ParserService implements SingletonInterface
         );
 
         // Classes which are not allowed for the parsing tag
-        $forbiddenParsingTagClasses = GeneralUtility::trimExplode(',', $this->settings['forbiddenParsingTagClasses'] ?? '', true);
+        $forbiddenParsingTagClasses = GeneralUtility::trimExplode(
+            ',',
+            $this->settings['forbiddenParsingTagClasses'] ?? '',
+            true
+        );
 
         // Classes which are not allowed for the parsing tag
-        $forbiddenParentClasses = GeneralUtility::trimExplode(',', $this->settings['forbiddenParentClasses'] ?? '', true);
+        $forbiddenParentClasses = GeneralUtility::trimExplode(
+            ',',
+            $this->settings['forbiddenParentClasses'] ?? '',
+            true
+        );
 
         // Tags which are not allowed as direct parent for a parsingTag
         $forbiddenParentTags = GeneralUtility::trimExplode(',', $this->settings['forbiddenParentTags'] ?? '', true);
@@ -410,11 +446,7 @@ class ParserService implements SingletonInterface
                         continue;
                     }
 
-                    $synonymTermObject->{
-                    ($this->settings['useTermForSynonymParsingDataWrap'] ?? false)
-                        ? 'setParsingName'
-                        : 'setName'
-                    }(
+                    $synonymTermObject->{($this->settings['useTermForSynonymParsingDataWrap'] ?? false) ? 'setParsingName' : 'setName'}(
                         $synonym->getName()
                     );
 
@@ -507,7 +539,8 @@ class ParserService implements SingletonInterface
 
                     if ($childNode instanceof DOMText) {
                         $text = preg_replace(
-                            '#\x{00a0}#u', '&nbsp;',
+                            '#\x{00a0}#u',
+                            '&nbsp;',
                             $childNode->ownerDocument->saveHTML($childNode)
                         );
 
@@ -530,15 +563,24 @@ class ParserService implements SingletonInterface
      * @param \Closure $wrapperClosure
      * @return string
      */
-    protected function regexParser(string $text, TermInterface $term, int &$replacements, Closure $wrapperClosure): string
-    {
+    protected function regexParser(
+        string $text,
+        TermInterface $term,
+        int &$replacements,
+        Closure $wrapperClosure
+    ): string {
         // Try simple search first to save performance
         if (mb_stripos($text, $term->getParsingName()) === false) {
             return $text;
         }
 
         $quotedTerm = preg_quote($term->getParsingName(), '#');
-        $umlautsInTerm = count(array_intersect(mb_str_split($quotedTerm), array_keys(ParserUtility::UMLAUT_MATCHING_GROUPS)));
+        $umlautsInTerm = count(
+            array_intersect(
+                mb_str_split($quotedTerm),
+                array_keys(ParserUtility::UMLAUT_MATCHING_GROUPS)
+            )
+        );
         $matchArrayEndingCharacterIndex = 3;
 
         if (!$term->isCaseSensitive() && $umlautsInTerm > 0) {

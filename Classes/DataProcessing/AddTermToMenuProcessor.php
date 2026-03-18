@@ -10,7 +10,7 @@ namespace Featdd\DpnGlossary\DataProcessing;
  * For the full copyright and license information, please read the
  * LICENSE.txt file that was distributed with this source code.
  *
- *  (c) 2024 Daniel Dorndorf <dorndorf@featdd.de>
+ *  (c) 2025 Daniel Dorndorf <dorndorf@featdd.de>
  *
  ***/
 
@@ -21,7 +21,7 @@ use TYPO3\CMS\Frontend\ContentObject\ContentObjectRenderer;
 use TYPO3\CMS\Frontend\ContentObject\DataProcessorInterface;
 
 /**
- * @package Featdd\DpnGlossary\Hook
+ * @package Featdd\DpnGlossary\DataProcessing
  */
 class AddTermToMenuProcessor implements DataProcessorInterface
 {
@@ -41,6 +41,7 @@ class AddTermToMenuProcessor implements DataProcessorInterface
      * @param array $processorConfiguration
      * @param array $processedData
      * @return array
+     * @throws \TYPO3\CMS\Frontend\ContentObject\Exception\ContentRenderingException
      */
     public function process(
         ContentObjectRenderer $cObj,
@@ -52,7 +53,7 @@ class AddTermToMenuProcessor implements DataProcessorInterface
             return $processedData;
         }
 
-        $parameters = GeneralUtility::_GET('tx_dpnglossary_glossary');
+        $parameters = $cObj->getRequest()->getQueryParams()['tx_dpnglossary_glossary'] ?? null;
 
         if (is_array($parameters) && (int) ($parameters['term'] ?? 0) > 0) {
             $term = $this->termRepository->findByUid((int) $parameters['term']);

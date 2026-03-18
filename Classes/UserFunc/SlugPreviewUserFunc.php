@@ -20,7 +20,7 @@ use TYPO3\CMS\Extbase\Utility\LocalizationUtility;
  * For the full copyright and license information, please read the
  * LICENSE.txt file that was distributed with this source code.
  *
- *  (c) 2024 Daniel Dorndorf <dorndorf@featdd.de>
+ *  (c) 2025 Daniel Dorndorf <dorndorf@featdd.de>
  *
  ***/
 
@@ -61,6 +61,8 @@ class SlugPreviewUserFunc
             /** @var \TYPO3\CMS\Core\Site\Entity\Site $site */
             $site = $parameters['site'];
             $languageId = $parameters['languageId'];
+            $termUid = $parameters['row']['uid'];
+            $slugValue = $parameters['row']['url_segment'];
 
             if ($site instanceof NullSite) {
                 $siteFinder = GeneralUtility::makeInstance(SiteFinder::class);
@@ -81,12 +83,12 @@ class SlugPreviewUserFunc
                     'tx_dpnglossary_glossary' => [
                         'action' => 'show',
                         'controller' => 'Term',
-                        'term' => 'SLUG',
+                        'term' => $termUid,
                     ],
                 ]
             );
 
-            return preg_replace('#SLUG/?$#', '', $prefixUrl);
+            return preg_replace('#' . preg_quote($slugValue) . '/?$#', '', $prefixUrl);
         }
 
         return '#';

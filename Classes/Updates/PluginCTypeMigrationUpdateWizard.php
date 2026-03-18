@@ -10,15 +10,14 @@ namespace Featdd\DpnGlossary\Updates;
  * For the full copyright and license information, please read the
  * LICENSE.txt file that was distributed with this source code.
  *
- *  (c) 2024 Daniel Dorndorf <dorndorf@featdd.de>
+ *  (c) 2025 Daniel Dorndorf <dorndorf@featdd.de>
  *
  ***/
 
-use PDO;
+use Doctrine\DBAL\ParameterType;
+use TYPO3\CMS\Install\Attribute\UpgradeWizard;
 
-/**
- * @package Featdd\DpnGlossary\Updates
- */
+#[UpgradeWizard('PluginCTypeMigrationUpdateWizard')]
 class PluginCTypeMigrationUpdateWizard extends AbstractUpdateWizard
 {
     /**
@@ -89,7 +88,7 @@ class PluginCTypeMigrationUpdateWizard extends AbstractUpdateWizard
                 ->where(
                     $queryBuilder->expr()->eq(
                         'uid',
-                        $queryBuilder->createNamedParameter($pluginRecord['uid'], PDO::PARAM_INT)
+                        $queryBuilder->createNamedParameter($pluginRecord['uid'], ParameterType::INTEGER)
                     )
                 )
                 ->executeStatement();

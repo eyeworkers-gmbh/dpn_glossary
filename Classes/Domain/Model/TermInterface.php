@@ -13,7 +13,7 @@ use TYPO3\CMS\Extbase\Persistence\ObjectStorage;
  * For the full copyright and license information, please read the
  * LICENSE.txt file that was distributed with this source code.
  *
- *  (c) 2024 Daniel Dorndorf <dorndorf@featdd.de>
+ *  (c) 2025 Daniel Dorndorf <dorndorf@featdd.de>
  *
  ***/
 interface TermInterface extends DomainObjectInterface
@@ -34,6 +34,21 @@ interface TermInterface extends DomainObjectInterface
      * @return string
      */
     public function getTermLink(): string;
+
+    /**
+     * @return string
+    */
+    public function getParsingName(): string;
+
+    /**
+     * @param string $parsingName
+     */
+    public function setParsingName(string $parsingName): void;
+
+    /**
+     * @return bool
+     */
+    public function isCaseSensitive(): bool;
 
     /**
      * @return bool

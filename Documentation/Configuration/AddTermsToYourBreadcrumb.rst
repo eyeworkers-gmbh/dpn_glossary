@@ -1,17 +1,10 @@
-.. ==================================================
-.. FOR YOUR INFORMATION
-.. --------------------------------------------------
-.. -*- coding: utf-8 -*- with BOM.
-
-.. include:: ../../Includes.txt
-
 ============================
 Add terms to your breadcrumb
 ============================
 
 You can add terms to your breadcrumb using the data processor in your TypoScript configuration.
 
-Example:
+**Example:**
 
 ::
 

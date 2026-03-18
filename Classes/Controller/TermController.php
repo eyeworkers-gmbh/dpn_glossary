@@ -10,7 +10,7 @@ namespace Featdd\DpnGlossary\Controller;
  * For the full copyright and license information, please read the
  * LICENSE.txt file that was distributed with this source code.
  *
- *  (c) 2024 Daniel Dorndorf <dorndorf@featdd.de>
+ *  (c) 2025 Daniel Dorndorf <dorndorf@featdd.de>
  *
  ***/
 
@@ -23,9 +23,13 @@ use Featdd\DpnGlossary\Pagination\CharacterPagination;
 use Featdd\DpnGlossary\Pagination\CharacterPaginator;
 use Featdd\DpnGlossary\Utility\ObjectUtility;
 use Psr\Http\Message\ResponseInterface;
+use TYPO3\CMS\Core\Http\ImmediateResponseException;
 use TYPO3\CMS\Core\MetaTag\MetaTagManagerRegistry;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
+use TYPO3\CMS\Extbase\Configuration\ConfigurationManagerInterface;
 use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
+use TYPO3\CMS\Extbase\Utility\LocalizationUtility;
+use TYPO3\CMS\Frontend\Controller\ErrorController;
 
 /**
  * @package Featdd\DpnGlossary\Controller
@@ -38,6 +42,11 @@ class TermController extends ActionController
     protected TermRepository $termRepository;
 
     /**
+     * @var int[]
+     */
+    protected $storagePids = [];
+
+    /**
      * @param \Featdd\DpnGlossary\Domain\Repository\TermRepository $termRepository
      */
     public function __construct(TermRepository $termRepository)
@@ -45,11 +54,25 @@ class TermController extends ActionController
         $this->termRepository = $termRepository;
     }
 
+    public function initializeAction(): void
+    {
+        $frameworkConfiguration = $this->configurationManager->getConfiguration(
+            ConfigurationManagerInterface::CONFIGURATION_TYPE_FRAMEWORK,
+            'DpnGlossary',
+        );
+
+        $this->storagePids = GeneralUtility::intExplode(
+            ',',
+            $frameworkConfiguration['persistence']['storagePid'] ?? '',
+            true
+        );
+    }
+
     /**
      * @param string|null $currentCharacter
      * @return \Psr\Http\Message\ResponseInterface
      */
-    public function listAction(string $currentCharacter = null): ResponseInterface
+    public function listAction(?string $currentCharacter = null): ResponseInterface
     {
         $listMode = $this->settings['listmode'] ?? 'normal';
         $terms = $this->termRepository->findAll();
@@ -59,19 +82,15 @@ class TermController extends ActionController
                 $terms = ObjectUtility::groupObjectsByFirstCharacter(
                     $terms,
                     'name',
-                    GeneralUtility::trimExplode(
-                        ',',
-                        $this->settings['groupedListCharacters'] ?? range('A', 'Z'),
-                        true
-                    )
+                    !empty($this->settings['groupedListCharacters'])
+                        ? GeneralUtility::trimExplode(',', $this->settings['groupedListCharacters'], true)
+                        : range('A', 'Z')
                 );
                 break;
             case 'pagination':
-                $paginationCharacters = GeneralUtility::trimExplode(
-                    ',',
-                    $this->settings['pagination']['characters'] ?? range('A', 'Z'),
-                    true
-                );
+                $paginationCharacters = !empty($this->settings['pagination']['characters'])
+                    ? GeneralUtility::trimExplode(',', $this->settings['pagination']['characters'], true)
+                    : range('A', 'Z');
 
                 $paginator = new CharacterPaginator($terms, 'name', $currentCharacter, ...$paginationCharacters);
                 $pagination = new CharacterPagination($paginator, ...$paginationCharacters);
@@ -144,7 +163,7 @@ class TermController extends ActionController
      */
     public function previewSelectedAction(): ResponseInterface
     {
-        $previewSelectedUids = GeneralUtility::intExplode(',', $this->settings['previewSelected']);
+        $previewSelectedUids = GeneralUtility::intExplode(',', $this->settings['previewSelected'], true);
 
         $this->view->assign(
             'terms',
@@ -161,6 +180,15 @@ class TermController extends ActionController
     public function showAction(Term $term): ResponseInterface
     {
         $this->view->assign('term', $term);
+
+        if (!in_array($term->getPid(), $this->storagePids)) {
+            $errorResponse = GeneralUtility::makeInstance(ErrorController::class)->pageNotFoundAction(
+                $this->request,
+                LocalizationUtility::translate('tx_dpnglossary.no_term_found', 'dpn_glossary')
+            );
+
+            throw new ImmediateResponseException($errorResponse);
+        }
 
         /** @var \Featdd\DpnGlossary\PageTitle\TermPageTitleProvider $pageTitleProvider */
         $pageTitleProvider = GeneralUtility::makeInstance(TermPageTitleProvider::class);

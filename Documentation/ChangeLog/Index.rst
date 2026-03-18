@@ -1,15 +1,31 @@
-﻿.. ==================================================
-.. FOR YOUR INFORMATION
-.. --------------------------------------------------
-.. -*- coding: utf-8 -*- with BOM.
-
-.. include:: ../Includes.txt
-
-.. _changelog:
+﻿.. _changelog:
 
 =========
 ChangeLog
 =========
+
+v6.1.3
+  * Prevent TypeErrors and handle missing StoragePids properly
+
+v6.1.2
+  * Remove "TCEforms" tag from FlexForm XML
+  * Use real slug value instead of dummy due to restrictions
+  * Code optimizations
+  * Add hook to auto clear terms cache if term in storage was edited
+  * Don't use range array for trim function if characters are empty
+
+v6.1.1
+  * Add missing upgrade wizard registration via PHP attributes
+  * Add documentation updates
+
+v6.1.0
+  * Add support for PHP 8.4
+  * Remove deprecated function calls and other optimizations
+  * Add storagePid check for term detail page
+
+v6.0.0
+  * Add support for TYPO3 v13
+  * Drop support for TYPO3 v11
 
 v5.3.2
   * Use proper icon registry configuration file (thanks to Achim Fritz)

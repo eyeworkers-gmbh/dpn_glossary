@@ -1,11 +1,4 @@
-﻿.. ==================================================
-.. FOR YOUR INFORMATION
-.. --------------------------------------------------
-.. -*- coding: utf-8 -*- with BOM.
-
-.. include:: Includes.txt
-
-============
+﻿============
 dpn_glossary
 ============
 
@@ -27,7 +20,7 @@ dpn_glossary
         glossary,glossar,dreipunktnull,dpn,parser,term
 
     :Copyright:
-        2024
+        2025
 
     :Author:
         Daniel Dorndorf
